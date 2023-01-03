@@ -17,24 +17,7 @@
 #include <opencv2/video.hpp>
 #include <opencv2/videoio.hpp>
 
-void opticalFlow(cv::VideoCapture  cap, std::string device);
-
-int main(int argc, const char **argv) {
-
-  std::string device = "cpu";
-
-  if (argc == 2) {
-
-    if (argv[1] == "cpu" || argv[1] == "gpu") {
-      device = argv[1];
-    } else {
-      std::cerr << "ERROR! Wrong option during called" << std::endl;
-      return (-1);
-    }
-  }
-
-  std::cout << "Configuration:" << std::endl;
-  std::cout << "device: " << device << std::endl;
+void opticalFlow(std::string device) {
 
   cv::Mat frame;
   cv::VideoCapture cap;
@@ -52,19 +35,43 @@ int main(int argc, const char **argv) {
   std::cout << "Start grabbing" << std::endl
             << "Press any key to terminate" << std::endl;
 
-//   for (;;) {
-//     // wait for a new frame from camera and store it into 'frame'
-//     cap.read(frame);
-//     // check if we succeeded
-//     if (frame.empty()) {
-//       std::cerr << "ERROR! blank frame grabbed\n";
-//       break;
-//     }
-//     // show live and wait for a key with timeout long enough to show images
-//     imshow("Live", frame);
-//     if (cv::waitKey(5) >= 0)
-//       break;
-//   }
+  for (;;) {
+    // wait for a new frame from camera and store it into 'frame'
+    cap.read(frame);
+    // check if we succeeded
+    if (frame.empty()) {
+      std::cerr << "ERROR! blank frame grabbed\n";
+      break;
+    }
+    // show live and wait for a key with timeout long enough to show images
+    imshow("Live", frame);
+    if (cv::waitKey(5) >= 0)
+      break;
+  }
+}
+
+int main(int argc, const char *argv[]) {
+
+  std::string device = "cpu";
+
+  if (argc == 2) {
+    std::cout << argv[1] << std::endl;
+    if (argv[1] == std::string("cpu") || argv[1] == std::string("gpu")) {
+      device = argv[1];
+    } else {
+      std::cerr << "ERROR! Wrong option during called" << std::endl;
+      return (-1);
+    }
+  }
+
+  if (argc > 2) {
+    std::cerr << "ERROR! To much options" << std::endl;
+    return (-1);
+  }
+
+  std::cout << "Configuration:" << std::endl;
+  std::cout << "device: " << device << std::endl;
+  opticalFlow(device);
 
   return 0;
 }
