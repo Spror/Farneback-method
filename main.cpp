@@ -17,45 +17,54 @@
 #include <opencv2/video.hpp>
 #include <opencv2/videoio.hpp>
 
+void opticalFlow(std::string device, std::string videoName) {}
+
 void opticalFlow(std::string device) {
 
-  cv::Mat frame;
-  cv::VideoCapture cap;
+  cv::VideoCapture capture;
 
   int deviceID = 0; // 0 = Deafult camera
   int apiID = 0;    // 0 = autodetect defaul API
 
-  cap.open(deviceID, apiID);
+  capture.open(deviceID, apiID);
 
-  if (!cap.isOpened()) {
+  if (!capture.isOpened()) {
     std::cerr << "ERROR! Unable to open camera" << std::endl;
     exit(-1);
   }
 
-  std::cout << "Start grabbing" << std::endl
-            << "Press any key to terminate" << std::endl;
+  std::unordered_map<std::string, std::vector<double>> timers;
 
-  for (;;) {
-    // wait for a new frame from camera and store it into 'frame'
-    cap.read(frame);
-    // check if we succeeded
-    if (frame.empty()) {
-      std::cerr << "ERROR! blank frame grabbed\n";
-      break;
-    }
-    // show live and wait for a key with timeout long enough to show images
-    imshow("Live", frame);
-    if (cv::waitKey(5) >= 0)
-      break;
+  double fps = capture.get(cv::CAP_PROP_FPS); // Default video FPS
+  // int numFrames= int(capture.get(cv::CAP_PROP_FRAME_COUNT)); //
+
+  cv::Mat frame, previousFrame;
+  capture >> frame;
+
+  if (device == "cpu") {
+
+    // resizing frame
+    cv::resize(frame, frame, cv::Size(960, 540), 0, 0, cv::INTER_LINEAR);
+
+    // converto to gray
+    cv::cvtColor(frame, previousFrame, cv::COLOR_BGR2GRAY);
+
+    //outputs to optical flow
   }
 }
 
+
+
 int main(int argc, const char *argv[]) {
+
+  if (argc > 3) {
+    std::cerr << "ERROR! To much options" << std::endl;
+    return (-1);
+  }
 
   std::string device = "cpu";
 
-  if (argc == 2) {
-    std::cout << argv[1] << std::endl;
+  if (argc >= 2) {
     if (argv[1] == std::string("cpu") || argv[1] == std::string("gpu")) {
       device = argv[1];
     } else {
@@ -64,14 +73,16 @@ int main(int argc, const char *argv[]) {
     }
   }
 
-  if (argc > 2) {
-    std::cerr << "ERROR! To much options" << std::endl;
-    return (-1);
-  }
-
   std::cout << "Configuration:" << std::endl;
   std::cout << "device: " << device << std::endl;
-  opticalFlow(device);
+
+  if (argc == 3) {
+    std::string videoName = argv[2];
+    std::cout << "File name: " << videoName << std::endl;
+    opticalFlow(device, videoName);
+  } else {
+    opticalFlow(device);
+  }
 
   return 0;
 }
