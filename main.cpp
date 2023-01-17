@@ -61,6 +61,17 @@ void opticalFlow(std::string device) {
 
   cv::Mat frame, previousFrame;
   capture >> frame;
+
+  int step = 16;
+  int h = frame.rows;
+  int w = frame.cols;
+  std::vector<cv::Point2f> points;
+  for (int y = step / 2; y < h; y += step) {
+    for (int x = step / 2; x < w; x += step) {
+      points.push_back(cv::Point2f(x, y));
+    }
+  }
+
   if (device == "cpu") {
 
     // convert to gray
@@ -74,10 +85,8 @@ void opticalFlow(std::string device) {
     hsv[1] = cv::Mat::ones(frame.size(), CV_32F);
 
     while (true) {
-      // start full pipeline timer
-      auto startFullTime = std::chrono::high_resolution_clock::now();
 
-      // start reading timer
+      auto startFullTime = std::chrono::high_resolution_clock::now();
       auto startReadTime = std::chrono::high_resolution_clock::now();
 
       // capture frame-by-frame
@@ -87,62 +96,48 @@ void opticalFlow(std::string device) {
       if (frame.empty())
         break;
 
-      // end reading timer
       auto endReadTime = std::chrono::high_resolution_clock::now();
-
-      // add elapsed iteration time
       timers["reading"].push_back(
           double(std::chrono::duration_cast<std::chrono::milliseconds>(
                      endReadTime - startReadTime)
                      .count()) /
           1000.0);
 
-      // start pre-process timer
       auto startPreTime = std::chrono::high_resolution_clock::now();
 
-      // convert to gray
       cv::Mat currentFrame;
       cv::cvtColor(frame, currentFrame, cv::COLOR_BGR2GRAY);
 
-      // end pre-process timer
       auto endPreTime = std::chrono::high_resolution_clock::now();
-
-      // add elapsed iteration time
       timers["pre-process"].push_back(
           double(std::chrono::duration_cast<std::chrono::milliseconds>(
                      endPreTime - startPreTime)
                      .count()) /
           1000.0);
 
-      // start optical flow timer
       auto startOfTime = std::chrono::high_resolution_clock::now();
 
       // calculate optical flow
-      cv::Mat flow;
+      cv::Mat flow(currentFrame.size(), CV_32FC2);
       calcOpticalFlowFarneback(previousFrame, currentFrame, flow, 0.5, 5, 15, 3,
                                5, 1.2, 0);
 
-      // end optical flow timer
       auto endOfTime = std::chrono::high_resolution_clock::now();
-
-      // add elapsed iteration time
       timers["optical flow"].push_back(
           double(std::chrono::duration_cast<std::chrono::milliseconds>(
                      endOfTime - startOfTime)
                      .count()) /
           1000.0);
 
-      // start post-process timer
-      auto startPostTime = std::chrono::high_resolution_clock::now();
+      // auto startPostTime = std::chrono::high_resolution_clock::now();
 
       flow.convertTo(flow, CV_32F, 1.0f / (1 << 3));
       cv::Mat magnitude, angle;
-      {
-        cv::Mat flowChannels[2];
-        split(flow, flowChannels);
-        cv::cartToPolar(flowChannels[0], flowChannels[1], magnitude, angle,
-                        true);
-      }
+
+      cv::Mat flowChannels[2];
+      split(flow, flowChannels);
+      cv::cartToPolar(flowChannels[0], flowChannels[1], magnitude, angle, true);
+
       float clip = 5;
       cv::threshold(magnitude, magnitude, clip, clip, cv::THRESH_TRUNC);
       hsv[0] = angle;
@@ -154,41 +149,22 @@ void opticalFlow(std::string device) {
       // update previous_frame value
       previousFrame = currentFrame;
 
-      // end post pipeline timer
-      auto endPostTime = std::chrono::high_resolution_clock::now();
-
-      // add elapsed iteration time
-      timers["post-process"].push_back(
-          double((std::chrono::duration_cast<std::chrono::milliseconds>(
-                      endPostTime - startPostTime)
-                      .count())) /
-          1000.0);
-
-      // end full pipeline timer
       auto endFullTime = std::chrono::high_resolution_clock::now();
-
-      // add elapsed iteration time
-      timers["full pipeline"].push_back(
+      auto pipelineTime =
           double(std::chrono::duration_cast<std::chrono::milliseconds>(
                      endFullTime - startFullTime)
                      .count()) /
-          1000.0);
+          1000.0;
+      timers["full pipeline"].push_back(pipelineTime);
 
       // visualization
       imshow("original", frame);
       imshow("result", bgr);
 
-      std::cout
-          << "FPS: "
-          << 1.0 /
-                 (double(std::chrono::duration_cast<std::chrono::milliseconds>(
-                             endFullTime - startFullTime)
-                             .count()) /
-                  1000.0)
-          << std::endl;
+      std::cout << "FPS: " << 1.0 / pipelineTime << std::endl;
 
       int keyboard = cv::waitKey(1);
-      if (keyboard == 27)
+      if (keyboard == 113 || keyboard == 'q')
         break;
     }
   } else {
@@ -212,10 +188,8 @@ void opticalFlow(std::string device) {
     gpu_hsv[1].upload(hsv[1]);
 
     while (true) {
-      // start full pipeline timer
-      auto startFullTime = std::chrono::high_resolution_clock::now();
 
-      // start reading timer
+      auto startFullTime = std::chrono::high_resolution_clock::now();
       auto startReadTime = std::chrono::high_resolution_clock::now();
 
       // capture frame-by-frame
@@ -229,34 +203,26 @@ void opticalFlow(std::string device) {
       cv::cuda::GpuMat gpuFrame;
       gpuFrame.upload(frame);
 
-      // end reading timer
       auto endReadTime = std::chrono::high_resolution_clock::now();
-
-      // add elapsed iteration time
       timers["reading"].push_back(
           double(std::chrono::duration_cast<std::chrono::milliseconds>(
                      endReadTime - startReadTime)
                      .count()) /
           1000.0);
 
-      // start pre-process timer
       auto startPreTime = std::chrono::high_resolution_clock::now();
 
       // convert to gray
       cv::cuda::GpuMat gpuCurrent;
       cv::cuda::cvtColor(gpuFrame, gpuCurrent, cv::COLOR_BGR2GRAY);
 
-      // end pre-process timer
       auto endPreTime = std::chrono::high_resolution_clock::now();
-
-      // add elapsed iteration time
       timers["pre-process"].push_back(
           double(std::chrono::duration_cast<std::chrono::milliseconds>(
                      endPreTime - startPreTime)
                      .count()) /
           1000.0);
 
-      // start optical flow timer
       auto startOfTime = std::chrono::high_resolution_clock::now();
 
       // create optical flow instance
@@ -267,28 +233,26 @@ void opticalFlow(std::string device) {
       cv::cuda::GpuMat gpuFlow;
       ptr_calc->calc(gpuPrevious, gpuCurrent, gpuFlow);
 
-      // end optical flow timer
       auto endOfTime = std::chrono::high_resolution_clock::now();
-
-      // add elapsed iteration time
       timers["optical flow"].push_back(
           double(std::chrono::duration_cast<std::chrono::milliseconds>(
                      endOfTime - startOfTime)
                      .count()) /
           1000.0);
 
-      // start post-process timer
       auto startPostTime = std::chrono::high_resolution_clock::now();
 
-      gpuFlow.cv::cuda::GpuMat::convertTo(gpuFlow, CV_32F, 1.0f / (1 << 5));
+      gpuFlow.cv::cuda::GpuMat::convertTo(gpuFlow, CV_32F, 1.0f / (1 << 3));
 
       cv::cuda::GpuMat flowChannels[2];
       cv::cuda::split(gpuFlow, flowChannels);
       cv::cuda::cartToPolar(flowChannels[0], flowChannels[1], gpuMagnitude,
                             gpuAngle, true);
 
+      cv::cuda::threshold(gpuMagnitude, gpuMagnitude, 5, 5, cv::THRESH_TRUNC);
       gpu_hsv[0] = gpuAngle;
-      gpu_hsv[2] = gpuMagnitude;
+
+      cv::cuda::divide(gpuMagnitude, 5, gpu_hsv[2]);
       cv::cuda::merge(gpu_hsv, 3, gpuMerged_hsv);
       cv::cuda::cvtColor(gpuMerged_hsv, gpu_bgr, cv::COLOR_HSV2BGR);
       gpu_bgr.cv::cuda::GpuMat::convertTo(gpu_bgr, CV_8U, 255.0);
@@ -302,20 +266,18 @@ void opticalFlow(std::string device) {
       // update previous_frame value
       gpuPrevious = gpuCurrent;
 
-      // end post pipeline timer
-      auto endPostTime = std::chrono::high_resolution_clock::now();
 
-      // add elapsed iteration time
+
+
+
+      auto endPostTime = std::chrono::high_resolution_clock::now();
       timers["post-process"].push_back(
           double(std::chrono::duration_cast<std::chrono::milliseconds>(
                      endPostTime - startPostTime)
                      .count()) /
           1000.0);
 
-      // end full pipeline timer
       auto endFullTime = std::chrono::high_resolution_clock::now();
-
-      // add elapsed iteration time
       auto pipelineTime =
           double(std::chrono::duration_cast<std::chrono::milliseconds>(
                      endFullTime - startFullTime)
@@ -331,7 +293,7 @@ void opticalFlow(std::string device) {
       std::cout << "FPS: " << 1.0 / pipelineTime << std::endl;
 
       int keyboard = cv::waitKey(1);
-      if (keyboard == 27)
+      if (keyboard == 27 || keyboard == 'q')
         break;
     }
   }
@@ -347,31 +309,21 @@ void opticalFlow(std::string device) {
 
 int main(int argc, const char *argv[]) {
 
-  if (argc > 3) {
-    std::cerr << "ERROR! To much options" << std::endl;
-    return (-1);
-  }
-
-  std::string device = "cpu";
-
-  if (argc >= 2) {
+  if (argc == 2) {
     if (argv[1] == std::string("cpu") || argv[1] == std::string("gpu")) {
-      device = argv[1];
+      std::string device = argv[1];
+
+      std::cout << "Configuration:" << std::endl;
+      std::cout << "device: " << device << std::endl;
+
+      opticalFlow(device);
     } else {
       std::cerr << "ERROR! Wrong option during called" << std::endl;
-      return (-1);
+      exit(-1);
     }
-  }
-
-  std::cout << "Configuration:" << std::endl;
-  std::cout << "device: " << device << std::endl;
-
-  if (argc == 3) {
-    std::string videoName = argv[2];
-    std::cout << "File name: " << videoName << std::endl;
-
   } else {
-    opticalFlow(device);
+    std::cerr << "ERROR! Wrong number of called arguments" << std::endl;
+    exit(-1);
   }
 
   return 0;

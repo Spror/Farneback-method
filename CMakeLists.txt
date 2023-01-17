@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 project(opticalFLow)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(FLAGS  -Wall -Wextra -pedantic -Wconversion -Werror)
+set(FLAGS  -Wall -Wextra -pedantic  -Werror)
 
 
 
