@@ -62,16 +62,6 @@ void opticalFlow(std::string device) {
   cv::Mat frame, previousFrame;
   capture >> frame;
 
-  int step = 16;
-  int h = frame.rows;
-  int w = frame.cols;
-  std::vector<cv::Point2f> points;
-  for (int y = step / 2; y < h; y += step) {
-    for (int x = step / 2; x < w; x += step) {
-      points.push_back(cv::Point2f(x, y));
-    }
-  }
-
   if (device == "cpu") {
 
     // convert to gray
@@ -190,6 +180,7 @@ void opticalFlow(std::string device) {
     while (true) {
 
       auto startFullTime = std::chrono::high_resolution_clock::now();
+
       auto startReadTime = std::chrono::high_resolution_clock::now();
 
       // capture frame-by-frame
@@ -265,10 +256,6 @@ void opticalFlow(std::string device) {
 
       // update previous_frame value
       gpuPrevious = gpuCurrent;
-
-
-
-
 
       auto endPostTime = std::chrono::high_resolution_clock::now();
       timers["post-process"].push_back(
